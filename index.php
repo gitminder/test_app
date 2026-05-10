@@ -6,6 +6,7 @@ $errors = [];
 $old = [
     'name' => '',
     'message' => '',
+    'rating' => null,
 ];
 
 if (!is_file($storagePath)) {
@@ -24,8 +25,11 @@ if ($rawJson !== false) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim((string)($_POST['name'] ?? ''));
     $message = trim((string)($_POST['message'] ?? ''));
+    $ratingRaw = $_POST['rating'] ?? null;
+    $rating = ($ratingRaw !== null && $ratingRaw !== '') ? (int)$ratingRaw : null;
     $old['name'] = $name;
     $old['message'] = $message;
+    $old['rating'] = $rating;
 
     if ($name === '') {
         $errors[] = 'Введите имя.';
@@ -39,10 +43,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Отзыв не должен быть длиннее 1000 символов.';
     }
 
+    if ($rating === null) {
+        $errors[] = 'Выберите оценку.';
+    } elseif ($rating < -2 || $rating > 2) {
+        $errors[] = 'Оценка должна быть от −2 до +2.';
+    }
+
     if ($errors === []) {
         array_unshift($reviews, [
             'name' => $name,
             'message' => $message,
+            'rating' => $rating,
             'created_at' => date('c'),
         ]);
 
@@ -121,6 +132,30 @@ function e(string $value): string
             padding: 0.75rem 1rem;
             margin-bottom: 1rem;
         }
+        .rating-group {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 0.25rem;
+        }
+        .rating-group label {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            margin-bottom: 0;
+            cursor: pointer;
+        }
+        .rating-badge {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+        .rating-neg2 { background: #f8d7da; color: #842029; }
+        .rating-neg1 { background: #ffe5d0; color: #984c0c; }
+        .rating-0    { background: #e2e3e5; color: #41464b; }
+        .rating-pos1 { background: #d1e7dd; color: #0f5132; }
+        .rating-pos2 { background: #a3cfbb; color: #0a3622; }
         .meta {
             color: #666;
             font-size: 0.9rem;
@@ -155,6 +190,17 @@ function e(string $value): string
             Отзыв
             <textarea name="message" rows="5" maxlength="1000" required><?= e($old['message']) ?></textarea>
         </label>
+        <div style="margin-bottom: 0.75rem;">
+            <span>Оценка</span>
+            <div class="rating-group">
+                <?php foreach ([-2, -1, 0, 1, 2] as $val): ?>
+                    <label>
+                        <input type="radio" name="rating" value="<?= $val ?>"<?= $old['rating'] === $val ? ' checked' : '' ?>>
+                        <?= $val > 0 ? '+' . $val : $val ?>
+                    </label>
+                <?php endforeach; ?>
+            </div>
+        </div>
         <button type="submit">Добавить отзыв</button>
     </form>
 
@@ -165,6 +211,13 @@ function e(string $value): string
             <article class="review">
                 <div class="meta">
                     <strong><?= e((string)($review['name'] ?? 'Аноним')) ?></strong>
+                    <?php if (isset($review['rating'])): ?>
+                        <?php
+                            $r = (int)$review['rating'];
+                            $cls = $r < -1 ? 'neg2' : ($r < 0 ? 'neg1' : ($r === 0 ? '0' : ($r === 1 ? 'pos1' : 'pos2')));
+                        ?>
+                        <span class="rating-badge rating-<?= $cls ?>"><?= $r > 0 ? '+' . $r : $r ?></span>
+                    <?php endif; ?>
                     <?php if (!empty($review['created_at'])): ?>
                         — <?= e((string)$review['created_at']) ?>
                     <?php endif; ?>
